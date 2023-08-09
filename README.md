@@ -1,5 +1,5 @@
 # TCSProject
-Refinitiv Matching Engine Exercise
+
 package pack
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
