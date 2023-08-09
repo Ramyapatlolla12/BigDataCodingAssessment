@@ -5,59 +5,48 @@ import org.apache.spark.sql.{ SparkSession, Dataset }
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{ StructType, StructField, IntegerType, StringType }
-import org.apache.spark.sql.{ SparkSession, DataFrame }
-import org.apache.spark.sql.expressions.Window
-
-object Task {
-  System.setProperty("hadoop.home.dir", "E:\\hadoop")
-  def main(args: Array[String]): Unit = {
-		
-			val conf = new SparkConf().setAppName("first").setMaster("local[*]")
-			val sc = new SparkContext(conf)
-			sc.setLogLevel("ERROR")
-			val spark = SparkSession.builder().getOrCreate()
-			import spark.implicits._
-			
-			
-			val Orders = spark.read.format("csv").load("file:///C:/data/exampleOrders.csv")
-			Orders.show()
-			
-			val rename = Orders.withColumnRenamed("_c0", "Order ID").withColumnRenamed("_c1", "User Name").withColumnRenamed("_c2", "Order Time").withColumnRenamed("_c3", "OrderType").withColumnRenamed("_c4", "Quantity").withColumnRenamed("_c5", "Price")
-			rename.show()
-			
-			val GBP = rename.withColumn("BUY", expr("case when OrderType = 'SELL' then 'USD' else 'GBP' end"))
-			GBP.show()
-			
-			val sellorders = GBP.filter(col("OrderType") === "SELL")
-		  sellorders.show()
-		  
-		  val buyorders = GBP.filter(col("OrderType") === "BUY")
-		  buyorders.show()
-		  
-		  val renamed = buyorders.withColumnRenamed("User Name", "UserName").withColumnRenamed("Order ID", "OrderID").withColumnRenamed("Order Time", "OrderTime").withColumnRenamed("OrderType", "Order Type").withColumnRenamed("Price", "Price1").withColumnRenamed("BUY", "BUY1")
-		  renamed.show()
-		  
-		  val matchorders = sellorders.join(renamed, Seq("Quantity"),"inner").drop("User Name","OrderType","BUY","UserName","Order Type","BUY1")
-		  matchorders.show()
-		  
-     
-      val Outputmatch = matchorders.withColumn("Order ID",regexp_replace($"Order ID", "1", "5"))
-                                   .withColumn("Price",regexp_replace($"Price", "4352", "7596"))
-                                
-                            
-      Outputmatch.show()
-		  
-      val finalorders = Outputmatch.withColumn("Order ID",regexp_replace($"Order ID", "52", "12"))
-                                   .withColumn("Order Time",regexp_replace($"Order Time", "1623239770", "1623239774")).drop("OrderTime","Price1")
-                            
-      finalorders.show()
-      
-      val examplematch = finalorders.withColumn("OrderID",regexp_replace($"OrderID", "5", "1"))
-      examplematch.show()
-      
-      val newOrder = Seq("Order ID","OrderID","Order Time", 
-                  "Quantity","Price")
-      val outputOrder = examplematch.select(newOrder.map(c => col(c)): _*) 
-      outputOrder.show()
-  }
+import org.apache.spark.sql.{SparkSession, DataFrame}
+object task {
+   def main(args: Array[String]): Unit = {
+    System.setProperty("hadoop.home.dir", "C:/data/Hadoop")
+    println("====started==")
+    val conf = new SparkConf().setAppName("first").setMaster("local[*]")
+    val sc = new SparkContext(conf)
+    sc.setLogLevel("ERROR")
+    val spark = SparkSession.builder().getOrCreate()
+    import spark.implicits._
+   
+    val schema = StructType(Seq(
+      StructField("OrderID", IntegerType, nullable = true),
+      StructField("UserName", StringType, nullable = true),
+      StructField("OrderTime", LongType, nullable = true),
+      StructField("OrderType", StringType, nullable = true),
+      StructField("Quantity", IntegerType, nullable = true),
+      StructField("Price", IntegerType, nullable = true)))
+       
+       val df = spark.read.option("Header", "false").schema(schema).csv("file:///C:/data/exampleOrders.csv")
+       df.show()
+       val ordersWithTimestamp = df.withColumn("OrderTimestamp", $"OrderTime".cast("timestamp"))
+       
+       val buyOrders = ordersWithTimestamp.filter(col("OrderType") === "BUY").withColumnRenamed("Price", "BuyPrice")
+           buyOrders.show()
+        val sellOrder = ordersWithTimestamp.filter(col("OrderType") === "SELL").withColumnRenamed("Price", "SellPrice")
+        sellOrder.show()
+        
+        val sellOrders = sellOrder.withColumnRenamed("OrderID", "OrderID_x").withColumnRenamed("UserName", "UserName_x")
+                                   .withColumnRenamed("OrderTime", "OrderTime_x").withColumnRenamed("OrderType", "OrderType_x")
+                                   .withColumnRenamed("OrderTimestamp", "OrderTimestamp_x")
+        val matchedOrders = buyOrders.join(sellOrders,Seq("Quantity"),"inner")
+                                      .withColumn("MatchedTime", least(col("OrderTimestamp"), col("OrderTimestamp_x")))
+                                      .withColumn("MatchedOrderID_BUY", col("OrderID"))
+                                      .withColumn("MatchedOrderID_SELL", col("OrderID_x"))
+                                      .withColumn("MatchedPrice", col("SellPrice"))
+               matchedOrders.show()                       
+           val finalResult = matchedOrders.select("MatchedOrderID_BUY", "MatchedOrderID_SELL", "MatchedPrice", "Quantity", "MatchedTime")
+                                       .drop("OrderTimestamp_x")
+        finalResult.show()
+       
+        
+   }
+  
 }
