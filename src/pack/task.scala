@@ -6,6 +6,7 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{ StructType, StructField, IntegerType, StringType }
 import org.apache.spark.sql.{SparkSession, DataFrame}
+import org.apache.spark.sql.expressions.Window
 object task {
    def main(args: Array[String]): Unit = {
     System.setProperty("hadoop.home.dir", "C:/data/Hadoop")
@@ -27,7 +28,6 @@ object task {
        val df = spark.read.option("Header", "false").schema(schema).csv("file:///C:/data/exampleOrders.csv")
        df.show()
        val ordersWithTimestamp = df.withColumn("OrderTimestamp", $"OrderTime".cast("timestamp"))
-       
        val buyOrders = ordersWithTimestamp.filter(col("OrderType") === "BUY").withColumnRenamed("Price", "BuyPrice")
            buyOrders.show()
         val sellOrder = ordersWithTimestamp.filter(col("OrderType") === "SELL").withColumnRenamed("Price", "SellPrice")
@@ -45,7 +45,6 @@ object task {
            val finalResult = matchedOrders.select("MatchedOrderID_BUY", "MatchedOrderID_SELL", "MatchedPrice", "Quantity", "MatchedTime")
                                        .drop("OrderTimestamp_x")
         finalResult.show()
-       
         
    }
   
